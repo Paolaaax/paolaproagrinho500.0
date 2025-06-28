@@ -1,0 +1,593 @@
+
+import React from 'react';
+
+interface CharacterProps {
+  x: number;
+  y: number;
+}
+
+const Character = ({ x, y }: CharacterProps) => {
+  return (
+    <div 
+      className="absolute transition-all duration-300 ease-out"
+      style={{ left: x - 25, top: y - 50 }}
+    >
+      <div className="w-12 h-16 relative">
+        {/* Character body with running animation */}
+        <div className="w-8 h-10 bg-blue-500 rounded-t-full mx-auto animate-pulse"></div>
+        <div className="w-10 h-6 bg-green-600 rounded mx-auto -mt-2 animate-bounce"></div>
+        
+        {/* Head with subtle movement */}
+        <div className="w-6 h-6 bg-amber-200 rounded-full mx-auto -mt-8 relative animate-pulse">
+          <div className="w-1 h-1 bg-black rounded-full absolute left-1 top-2"></div>
+          <div className="w-1 h-1 bg-black rounded-full absolute right-1 top-2"></div>
+          <div className="w-2 h-1 bg-pink-400 rounded absolute left-2 top-3"></div>
+        </div>
+        
+        {/* Hat */}
+        <div className="w-8 h-3 bg-amber-800 rounded-full mx-auto -mt-7 relative">
+          <div className="w-6 h-2 bg-amber-900 rounded-full mx-auto mt-0.5"></div>
+        </div>
+        
+        {/* Arms with swinging motion */}
+        <div className="w-2 h-4 bg-amber-200 rounded absolute left-0 top-4 animate-pulse transform origin-top"></div>
+        <div className="w-2 h-4 bg-amber-200 rounded absolute right-0 top-4 animate-pulse transform origin-top" style={{ animationDelay: '0.2s' }}></div>
+        
+        {/* Legs with running motion */}
+        <div className="w-2 h-6 bg-blue-800 rounded absolute left-1 bottom-0 animate-bounce transform origin-top" style={{ animationDelay: '0.1s' }}></div>
+        <div className="w-2 h-6 bg-blue-800 rounded absolute right-1 bottom-0 animate-bounce transform origin-top" style={{ animationDelay: '0.3s' }}></div>
+        
+        {/* Enhanced running effects */}
+        <div className="absolute -bottom-2 left-0 right-0 text-center text-xs opacity-70 animate-pulse">
+          💨💨
+        </div>
+        
+        {/* Dust cloud effect */}
+        <div className="absolute -bottom-1 -left-2 w-8 h-2 bg-amber-200 rounded-full opacity-30 animate-ping"></div>
+      </div>
+    </div>
+  );
+};
+
+export default Character;
+
+
+import React from 'react';
+
+interface CollectibleProps {
+  x: number;
+  y: number;
+  type: string;
+}
+
+const Collectible = ({ x, y, type }: CollectibleProps) => {
+  const getCollectibleEmoji = () => {
+    switch (type) {
+      case 'book':
+        return '📚';
+      case 'seed':
+        return '🌱';
+      case 'tool':
+        return '🔧';
+      case 'solar':
+        return '🔋';
+      case 'quiz':
+        return '🃏';
+      default:
+        return '⭐';
+    }
+  };
+
+  const getCollectibleColor = () => {
+    switch (type) {
+      case 'book':
+        return 'bg-blue-400';
+      case 'seed':
+        return 'bg-green-400';
+      case 'tool':
+        return 'bg-gray-400';
+      case 'solar':
+        return 'bg-yellow-400';
+      case 'quiz':
+        return 'bg-purple-400';
+      default:
+        return 'bg-yellow-300';
+    }
+  };
+
+  return (
+    <div 
+      className="absolute transition-all duration-200 ease-out"
+      style={{ left: x - 20, top: y }}
+    >
+      <div className={`w-10 h-10 ${getCollectibleColor()} rounded-full flex items-center justify-center shadow-lg border-2 border-white animate-bounce`}>
+        <span className="text-lg animate-pulse">{getCollectibleEmoji()}</span>
+      </div>
+      
+      {/* Glowing effect */}
+      <div className="absolute inset-0 rounded-full animate-ping opacity-30" style={{ backgroundColor: 'rgba(255, 255, 255, 0.5)' }}></div>
+      
+      {/* Shadow effect */}
+      <div className="absolute -bottom-1 left-1 w-8 h-2 bg-black/20 rounded-full blur-sm"></div>
+    </div>
+  );
+};
+
+export default Collectible;
+
+import React, { useState, useEffect, useCallback } from 'react';
+import Character from './Character';
+import Obstacle from './Obstacle';
+import Collectible from './Collectible';
+import GameHUD from './GameHUD';
+import { quizQuestions } from './quizData';
+
+interface GameScreenProps {
+  score: number;
+  lives: number;
+  onScoreChange: (score: number) => void;
+  onQuizTrigger: (quiz: any) => void;
+  onGameOver: () => void;
+}
+
+interface GameObject {
+  id: number;
+  x: number;
+  y: number;
+  type: string;
+  lane: number;
+}
+
+const LANES = [150, 250, 350]; // Three lanes for the character
+const GAME_SPEED = 2;
+
+const GameScreen = ({ score, lives, onScoreChange, onQuizTrigger, onGameOver }: GameScreenProps) => {
+  const [characterLane, setCharacterLane] = useState(1); // Middle lane
+  const [obstacles, setObstacles] = useState<GameObject[]>([]);
+  const [collectibles, setCollectibles] = useState<GameObject[]>([]);
+  const [gameSpeed, setGameSpeed] = useState(GAME_SPEED);
+  const [nextId, setNextId] = useState(1);
+
+  // Character movement with smooth animation
+  const moveCharacter = useCallback((direction: 'left' | 'right') => {
+    setCharacterLane(prev => {
+      if (direction === 'left' && prev > 0) return prev - 1;
+      if (direction === 'right' && prev < 2) return prev + 1;
+      return prev;
+    });
+  }, []);
+
+  // Keyboard controls
+  useEffect(() => {
+    const handleKeyPress = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') {
+        moveCharacter('left');
+      } else if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') {
+        moveCharacter('right');
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyPress);
+    return () => window.removeEventListener('keydown', handleKeyPress);
+  }, [moveCharacter]);
+
+  // Touch controls
+  useEffect(() => {
+    let touchStartX: number;
+
+    const handleTouchStart = (e: TouchEvent) => {
+      touchStartX = e.touches[0].clientX;
+    };
+
+    const handleTouchEnd = (e: TouchEvent) => {
+      const touchEndX = e.changedTouches[0].clientX;
+      const diff = touchStartX - touchEndX;
+
+      if (Math.abs(diff) > 50) { // Minimum swipe distance
+        if (diff > 0) {
+          moveCharacter('left');
+        } else {
+          moveCharacter('right');
+        }
+      }
+    };
+
+    window.addEventListener('touchstart', handleTouchStart);
+    window.addEventListener('touchend', handleTouchEnd);
+    
+    return () => {
+      window.removeEventListener('touchstart', handleTouchStart);
+      window.removeEventListener('touchend', handleTouchEnd);
+    };
+  }, [moveCharacter]);
+
+  // Generate obstacles and collectibles
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (Math.random() < 0.3) { // 30% chance to spawn obstacle
+        const lane = Math.floor(Math.random() * 3);
+        const obstacleTypes = ['tractor', 'mud', 'animal', 'log'];
+        const type = obstacleTypes[Math.floor(Math.random() * obstacleTypes.length)];
+        
+        setObstacles(prev => [...prev, {
+          id: nextId,
+          x: LANES[lane],
+          y: -50,
+          type,
+          lane
+        }]);
+        setNextId(prev => prev + 1);
+      }
+
+      if (Math.random() < 0.2) { // 20% chance to spawn collectible
+        const lane = Math.floor(Math.random() * 3);
+        const collectibleTypes = ['book', 'seed', 'tool', 'solar', 'quiz'];
+        const type = collectibleTypes[Math.floor(Math.random() * collectibleTypes.length)];
+        
+        setCollectibles(prev => [...prev, {
+          id: nextId + 1000,
+          x: LANES[lane],
+          y: -50,
+          type,
+          lane
+        }]);
+        setNextId(prev => prev + 2);
+      }
+    }, 1500);
+
+    return () => clearInterval(interval);
+  }, [nextId]);
+
+  // Move objects and handle collisions with enhanced animations
+  useEffect(() => {
+    const gameLoop = setInterval(() => {
+      // Move obstacles with varied speeds for more natural movement
+      setObstacles(prev => prev
+        .map(obstacle => ({ 
+          ...obstacle, 
+          y: obstacle.y + gameSpeed + (obstacle.type === 'animal' ? Math.sin(Date.now() * 0.01) * 0.5 : 0)
+        }))
+        .filter(obstacle => obstacle.y < window.innerHeight + 50)
+      );
+
+      // Move collectibles with floating animation
+      setCollectibles(prev => prev
+        .map(collectible => ({ 
+          ...collectible, 
+          y: collectible.y + gameSpeed,
+          x: collectible.x + Math.sin(Date.now() * 0.005 + collectible.id) * 0.5
+        }))
+        .filter(collectible => collectible.y < window.innerHeight + 50)
+      );
+
+      // Increase score over time
+      onScoreChange(score + 1);
+    }, 50);
+
+    return () => clearInterval(gameLoop);
+  }, [gameSpeed, score, onScoreChange]);
+
+  // Collision detection
+  useEffect(() => {
+    const characterX = LANES[characterLane];
+    const characterY = window.innerHeight - 200; // Character position
+
+    // Check obstacle collisions
+    obstacles.forEach(obstacle => {
+      if (
+        obstacle.lane === characterLane &&
+        obstacle.y > characterY - 50 &&
+        obstacle.y < characterY + 50
+      ) {
+        // Collision with obstacle
+        setObstacles(prev => prev.filter(o => o.id !== obstacle.id));
+        onGameOver();
+      }
+    });
+
+    // Check collectible collisions
+    collectibles.forEach(collectible => {
+      if (
+        collectible.lane === characterLane &&
+        collectible.y > characterY - 50 &&
+        collectible.y < characterY + 50
+      ) {
+        // Collected item
+        setCollectibles(prev => prev.filter(c => c.id !== collectible.id));
+        
+        if (collectible.type === 'quiz') {
+          // Trigger quiz
+          const randomQuiz = quizQuestions[Math.floor(Math.random() * quizQuestions.length)];
+          onQuizTrigger(randomQuiz);
+        } else {
+          // Regular collectible
+          onScoreChange(score + 20);
+        }
+      }
+    });
+  }, [characterLane, obstacles, collectibles, score, onScoreChange, onQuizTrigger, onGameOver]);
+
+  return (
+    <div className="w-full h-full relative overflow-hidden bg-gradient-to-b from-blue-400 to-green-400">
+      {/* Enhanced background scenery with animated elements */}
+      <div className="absolute inset-0 bg-gradient-to-b from-sky-300 via-green-300 to-green-500">
+        {/* Animated clouds */}
+        <div className="absolute top-4 left-10 w-16 h-8 bg-white/60 rounded-full animate-pulse"></div>
+        <div className="absolute top-8 right-20 w-12 h-6 bg-white/50 rounded-full animate-pulse" style={{ animationDelay: '1s' }}></div>
+        
+        {/* Road/path with moving lines */}
+        <div className="absolute bottom-0 w-full h-2/3 bg-gradient-to-t from-amber-700 to-amber-600 opacity-60"></div>
+        <div className="absolute bottom-0 left-1/4 w-2 h-full bg-white opacity-50 animate-pulse"></div>
+        <div className="absolute bottom-0 right-1/4 w-2 h-full bg-white opacity-50 animate-pulse" style={{ animationDelay: '0.5s' }}></div>
+        
+        {/* Animated grass on sides */}
+        <div className="absolute bottom-0 left-0 w-24 h-32 bg-green-500 opacity-70 animate-pulse"></div>
+        <div className="absolute bottom-0 right-0 w-24 h-32 bg-green-500 opacity-70 animate-pulse" style={{ animationDelay: '0.3s' }}></div>
+      </div>
+
+      {/* Game objects */}
+      {obstacles.map(obstacle => (
+        <Obstacle key={obstacle.id} x={obstacle.x} y={obstacle.y} type={obstacle.type} />
+      ))}
+      
+      {collectibles.map(collectible => (
+        <Collectible key={collectible.id} x={collectible.x} y={collectible.y} type={collectible.type} />
+      ))}
+
+      {/* Character with enhanced animation */}
+      <Character x={LANES[characterLane]} y={window.innerHeight - 200} />
+
+      {/* HUD */}
+      <GameHUD score={score} lives={lives} />
+
+      {/* Touch controls for mobile */}
+      <div className="absolute bottom-4 left-4 right-4 flex justify-between md:hidden">
+        <button
+          onTouchStart={() => moveCharacter('left')}
+          className="bg-white/20 backdrop-blur-sm rounded-full p-4 text-2xl active:bg-white/40 transition-all duration-200 animate-pulse"
+        >
+          ⬅️
+        </button>
+        <button
+          onTouchStart={() => moveCharacter('right')}
+          className="bg-white/20 backdrop-blur-sm rounded-full p-4 text-2xl active:bg-white/40 transition-all duration-200 animate-pulse"
+        >
+          ➡️
+        </button>
+      </div>
+
+      {/* Instructions */}
+      <div className="absolute top-4 left-1/2 transform -translate-x-1/2 bg-white/90 backdrop-blur-sm rounded-lg px-4 py-2 text-sm text-center animate-bounce">
+        <p className="font-semibold text-gray-800">
+          🖥️ Use ← → ou A/D | 📱 Deslize ou toque nas setas
+        </p>
+      </div>
+    </div>
+  );
+};
+
+export default GameScreen;
+
+import React from 'react';
+
+interface ObstacleProps {
+  x: number;
+  y: number;
+  type: string;
+}
+
+const Obstacle = ({ x, y, type }: ObstacleProps) => {
+  const getObstacleEmoji = () => {
+    switch (type) {
+      case 'tractor':
+        return '🚜';
+      case 'mud':
+        return '🟤';
+      case 'animal':
+        return '🐄';
+      case 'log':
+        return '🪵';
+      default:
+        return '⚠️';
+    }
+  };
+
+  const getObstacleColor = () => {
+    switch (type) {
+      case 'tractor':
+        return 'bg-red-500';
+      case 'mud':
+        return 'bg-amber-800';
+      case 'animal':
+        return 'bg-pink-200';
+      case 'log':
+        return 'bg-amber-600';
+      default:
+        return 'bg-gray-500';
+    }
+  };
+
+  const getAnimationClass = () => {
+    switch (type) {
+      case 'animal':
+        return 'animate-bounce';
+      case 'tractor':
+        return 'animate-pulse';
+      case 'mud':
+        return 'animate-ping';
+      default:
+        return 'animate-pulse';
+    }
+  };
+
+  return (
+    <div 
+      className="absolute transition-all duration-200 ease-out"
+      style={{ left: x - 25, top: y }}
+    >
+      <div className={`w-12 h-12 ${getObstacleColor()} rounded-lg flex items-center justify-center shadow-lg border-2 border-gray-700 ${getAnimationClass()}`}>
+        <span className="text-2xl">{getObstacleEmoji()}</span>
+      </div>
+      
+      {/* Shadow effect for depth */}
+      <div className="absolute -bottom-1 left-1 w-10 h-3 bg-black/20 rounded-full blur-sm"></div>
+    </div>
+  );
+};
+
+export default Obstacle;
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. */
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+
+    --primary: 222.2 47.4% 11.2%;
+    --primary-foreground: 210 40% 98%;
+
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222.2 47.4% 11.2%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 222.2 84% 4.9%;
+
+    --radius: 0.5rem;
+
+    --sidebar-background: 0 0% 98%;
+
+    --sidebar-foreground: 240 5.3% 26.1%;
+
+    --sidebar-primary: 240 5.9% 10%;
+
+    --sidebar-primary-foreground: 0 0% 98%;
+
+    --sidebar-accent: 240 4.8% 95.9%;
+
+    --sidebar-accent-foreground: 240 5.9% 10%;
+
+    --sidebar-border: 220 13% 91%;
+
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+
+  .dark {
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+
+    --card: 222.2 84% 4.9%;
+    --card-foreground: 210 40% 98%;
+
+    --popover: 222.2 84% 4.9%;
+    --popover-foreground: 210 40% 98%;
+
+    --primary: 210 40% 98%;
+    --primary-foreground: 222.2 47.4% 11.2%;
+
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+
+    --accent: 217.2 32.6% 17.5%;
+    --accent-foreground: 210 40% 98%;
+
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 212.7 26.8% 83.9%;
+    --sidebar-background: 240 5.9% 10%;
+    --sidebar-foreground: 240 4.8% 95.9%;
+    --sidebar-primary: 224.3 76.3% 48%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 240 3.7% 15.9%;
+    --sidebar-accent-foreground: 240 4.8% 95.9%;
+    --sidebar-border: 240 3.7% 15.9%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+/* Custom animations inspired by animal movements */
+@keyframes gallop {
+  0%, 100% { transform: translateY(0px) scale(1); }
+  25% { transform: translateY(-8px) scale(1.05); }
+  50% { transform: translateY(-4px) scale(1.02); }
+  75% { transform: translateY(-12px) scale(1.08); }
+}
+
+@keyframes sway {
+  0%, 100% { transform: translateX(0px) rotate(0deg); }
+  50% { transform: translateX(3px) rotate(1deg); }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-10px); }
+}
+
+@keyframes runningLegs {
+  0% { transform: rotate(0deg); }
+  25% { transform: rotate(20deg); }
+  50% { transform: rotate(0deg); }
+  75% { transform: rotate(-20deg); }
+  100% { transform: rotate(0deg); }
+}
+
+@keyframes breathe {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.03); }
+}
+
+.animate-gallop {
+  animation: gallop 0.6s ease-in-out infinite;
+}
+
+.animate-sway {
+  animation: sway 2s ease-in-out infinite;
+}
+
+.animate-float {
+  animation: float 3s ease-in-out infinite;
+}
+
+.animate-running-legs {
+  animation: runningLegs 0.3s linear infinite;
+}
+
+.animate-breathe {
+  animation: breathe 2s ease-in-out infinite;
+}
